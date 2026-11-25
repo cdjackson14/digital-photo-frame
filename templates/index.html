@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Digital Photo Frame</title>
+  <style>
+    :root {
+      --bg: #0f1218;
+      --surface: #181d27;
+      --surface-2: #222938;
+      --border: #2c3547;
+      --text: #eef2f8;
+      --muted: #93a1b8;
+      --accent: #4f8cff;
+      --accent-hover: #3a78f0;
+      --danger: #e5484d;
+      --success: #30a46c;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding-bottom: 60px;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand h1 { font-size: 1.2rem; font-weight: 700; }
+    .badge {
+      font-size: 0.78rem;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .badge.live { color: #7ee2b8; border-color: #245c43; background: #122c20; }
+    .badge.sleep { color: #f5c97b; border-color: #5a4319; background: #2b210e; }
+
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button, .btn {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button:hover { background: #2b3447; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.primary:hover { background: var(--accent-hover); }
+    button.danger { background: #3b181b; border-color: #6b242a; color: #ff8e92; }
+    button.danger:hover { background: var(--danger); color: #fff; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    main { max-width: 1100px; margin: 20px auto; padding: 0 16px; }
+
+    .status-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .status-strip strong { color: var(--text); }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 1rem;
+      padding: 8px 16px;
+      border-radius: 8px;
+    }
+    .tab-btn.active {
+      background: var(--surface-2);
+      color: var(--text);
+      font-weight: 600;
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Upload dropzone */
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 20px;
+    }
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: #17233a;
+    }
+    .dropzone p { color: var(--muted); margin-top: 6px; font-size: 0.9rem; }
+    .progress-wrap {
+      margin-top: 12px;
+      height: 8px;
+      background: var(--surface-2);
+      border-radius: 999px;
+      overflow: hidden;
+      display: none;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.2s;
+    }
+
+    /* Gallery toolbar & grid */
+    .gallery-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px;
+    }
+    .photo-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .photo-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(79,140,255,0.35); }
+    .photo-card.playing { border-color: var(--success); }
+    .photo-thumb-wrap {
+      aspect-ratio: 4 / 3;
+      background: #0a0d12;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+    }
+    .photo-thumb-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .select-check {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 22px;
+      height: 22px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .playing-pill {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(18, 44, 32, 0.9);
+      color: #7ee2b8;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+    .photo-meta {
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .photo-name {
+      font-size: 0.82rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+    .photo-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: space-between;
+    }
+    .photo-actions button {
+      padding: 4px 8px;
+      font-size: 0.78rem;
+      flex: 1;
+    }
+
+    /* Settings form */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 18px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+    .card h2 {
+      font-size: 1rem;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .field { margin-bottom: 14px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label {
+      display: block;
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field input[type="number"],
+    .field input[type="time"],
+    .field select {
+      width: 100%;
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 0.95rem;
+    }
+    .field input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 6px 0;
+    }
+    .toggle-row label { margin: 0; color: var(--text); font-size: 0.92rem; }
+    .toggle-row input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .time-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .save-bar {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* Lightbox */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 20px;
+    }
+    .modal.open { display: flex; }
+    .modal img {
+      max-width: 92vw;
+      max-height: 85vh;
+      border-radius: 8px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    }
+    .modal-close {
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      font-size: 1.4rem;
+      padding: 6px 14px;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 18px;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 60;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .empty-msg {
+      text-align: center;
+      color: var(--muted);
+      padding: 40px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <h1>Digital Photo Frame</h1>
+        <span id="statusBadge" class="badge live">Playing</span>
+      </div>
+      <div class="controls-bar">
+        <button onclick="sendControl('prev')" title="Previous photo">Prev</button>
+        <button id="pauseBtn" onclick="sendControl('toggle_pause')">Pause</button>
+        <button onclick="sendControl('next')" title="Next photo">Next</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="status-strip">
+      <div>Now Showing: <strong id="nowPlaying">—</strong></div>
+      <div>Photos: <strong id="photoCount">0</strong> &nbsp;|&nbsp; Free Space: <strong id="diskFree">—</strong></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="photos" onclick="switchTab('photos')">Photos</button>
+      <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">Settings</button>
+    </div>
+
+    <!-- PHOTOS TAB -->
+    <section id="tab-photos" class="tab-panel active">
+      <div id="dropzone" class="dropzone" onclick="document.getElementById('fileInput').click()">
+        <strong>Tap or drag &amp; drop photos here to upload</strong>
+        <p>Supports JPG, PNG, WEBP, BMP, GIF (multiple files allowed)</p>
+        <input id="fileInput" type="file" accept="image/*" multiple hidden />
+        <div id="progressWrap" class="progress-wrap">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+      </div>
+
+      <div class="gallery-toolbar">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button onclick="toggleSelectAll()">Select All</button>
+          <button id="deleteSelectedBtn" class="danger" onclick="deleteSelected()" disabled>Delete Selected (0)</button>
+        </div>
+        <button onclick="loadPhotos()">Refresh</button>
+      </div>
+
+      <div id="photoGrid" class="photo-grid"></div>
+      <div id="emptyGallery" class="empty-msg" style="display:none;">
+        No photos uploaded yet. Use the upload box above to add photos to your frame!
+      </div>
+    </section>
+
+    <!-- SETTINGS TAB -->
+    <section id="tab-settings" class="tab-panel">
+      <form id="settingsForm" onsubmit="saveSettings(event)">
+        <div class="settings-grid">
+          <div class="card">
+            <h2>Slideshow</h2>
+            <div class="field">
+              <label for="duration">Photo Duration (seconds)</label>
+              <input id="duration" type="number" min="1" max="86400" step="1" required />
+            </div>
+            <div class="field">
+              <label for="order">Playback Order</label>
+              <select id="order">
+                <option value="cycle">Cycle (Alphabetical)</option>
+                <option value="newest">Cycle (Newest First)</option>
+                <option value="random">Random (Shuffle)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="transition">Transition Type</label>
+              <select id="transition">
+                <option value="fade">Fade (Crossfade)</option>
+                <option value="none">None (Instant)</option>
+                <option value="slide_left">Slide Left</option>
+                <option value="slide_right">Slide Right</option>
+                <option value="slide_up">Slide Up</option>
+                <option value="slide_down">Slide Down</option>
+                <option value="zoom">Zoom Fade</option>
+                <option value="random">Random Transition</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="transition_duration">Transition Speed (seconds): <strong id="transDurVal">1.0</strong>s</label>
+              <input id="transition_duration" type="range" min="0.2" max="3.0" step="0.1"
+                     oninput="document.getElementById('transDurVal').textContent = parseFloat(this.value).toFixed(1)" />
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Display</h2>
+            <div class="field">
+              <label for="fit_mode">Photo Scaling Mode</label>
+              <select id="fit_mode">
+                <option value="blur_fit">Fit with Blurred Background (Recommended)</option>
+                <option value="fit">Fit Inside Screen (Black Bars)</option>
+                <option value="fill">Fill Screen (Crop to Fit)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="rotation">Screen Rotation</label>
+              <select id="rotation">
+                <option value="0">0° (Landscape)</option>
+                <option value="90">90° (Portrait CW)</option>
+                <option value="180">180° (Upside Down)</option>
+                <option value="270">270° (Portrait CCW)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="brightness">Brightness: <strong id="brightnessVal">100</strong>%</label>
+              <input id="brightness" type="range" min="10" max="100" step="5"
+                     oninput="document.getElementById('brightnessVal').textContent = this.value" />
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Overlays</h2>
+            <div class="toggle-row">
+              <label for="show_clock">Show Clock &amp; Date</label>
+              <input id="show_clock" type="checkbox" />
+            </div>
+            <div class="toggle-row">
+              <label for="clock_24h">Use 24-Hour Clock</label>
+              <input id="clock_24h" type="checkbox" />
+            </div>
+            <div class="toggle-row">
+              <label for="show_caption">Show Photo Date / Filename</label>
+              <input id="show_caption" type="checkbox" />
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Sleep Schedule (Night Mode)</h2>
+            <div class="toggle-row">
+              <label for="sleep_enabled">Enable Automatic Sleep</label>
+              <input id="sleep_enabled" type="checkbox" />
+            </div>
+            <div class="time-pair" style="margin-top:12px;">
+              <div class="field">
+                <label for="sleep_start">Sleep At</label>
+                <input id="sleep_start" type="time" />
+              </div>
+              <div class="field">
+                <label for="sleep_end">Wake Up At</label>
+                <input id="sleep_end" type="time" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="save-bar">
+          <button type="submit" class="primary">Save Settings</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <!-- Lightbox Modal -->
+  <div id="lightbox" class="modal" onclick="closeLightbox()">
+    <button class="modal-close" onclick="closeLightbox()">&times;</button>
+    <img id="lightboxImg" src="" alt="Preview" onclick="event.stopPropagation()" />
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    let currentPlaying = null;
+    let allPhotos = [];
+    const selectedFiles = new Set();
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => el.classList.remove('show'), 2800);
+    }
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+    }
+
+    async function loadStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        currentPlaying = data.current_photo;
+        document.getElementById('nowPlaying').textContent = data.current_photo || 'None';
+        document.getElementById('photoCount').textContent = data.total_photos;
+        document.getElementById('diskFree').textContent = `${data.disk_free_gb} GB (${100 - data.disk_used_pct}% free)`;
+
+        const badge = document.getElementById('statusBadge');
+        const pauseBtn = document.getElementById('pauseBtn');
+        if (data.sleeping) {
+          badge.textContent = 'Sleeping';
+          badge.className = 'badge sleep';
+        } else if (data.paused) {
+          badge.textContent = 'Paused';
+          badge.className = 'badge';
+        } else {
+          badge.textContent = 'Playing';
+          badge.className = 'badge live';
+        }
+        pauseBtn.textContent = data.paused ? 'Resume' : 'Pause';
+
+        document.querySelectorAll('.photo-card').forEach(card => {
+          const isNow = card.dataset.name === currentPlaying;
+          card.classList.toggle('playing', isNow);
+          const pill = card.querySelector('.playing-pill');
+          if (pill) pill.style.display = isNow ? 'block' : 'none';
+        });
+      } catch (e) { /* ignore transient network hiccups */ }
+    }
+
+    async function sendControl(action, extra = {}) {
+      await fetch('/api/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...extra })
+      });
+      setTimeout(loadStatus, 350);
+    }
+
+    async function loadConfig() {
+      const res = await fetch('/api/config');
+      const { config } = await res.json();
+      document.getElementById('duration').value = config.duration;
+      document.getElementById('order').value = config.order;
+      document.getElementById('transition').value = config.transition;
+      document.getElementById('transition_duration').value = config.transition_duration;
+      document.getElementById('transDurVal').textContent = parseFloat(config.transition_duration).toFixed(1);
+      document.getElementById('fit_mode').value = config.fit_mode;
+      document.getElementById('rotation').value = String(config.rotation);
+      document.getElementById('brightness').value = config.brightness;
+      document.getElementById('brightnessVal').textContent = config.brightness;
+      document.getElementById('show_clock').checked = !!config.show_clock;
+      document.getElementById('clock_24h').checked = !!config.clock_24h;
+      document.getElementById('show_caption').checked = !!config.show_caption;
+      document.getElementById('sleep_enabled').checked = !!config.sleep_enabled;
+      document.getElementById('sleep_start').value = config.sleep_start;
+      document.getElementById('sleep_end').value = config.sleep_end;
+    }
+
+    async function saveSettings(event) {
+      event.preventDefault();
+      const payload = {
+        duration: Number(document.getElementById('duration').value),
+        order: document.getElementById('order').value,
+        transition: document.getElementById('transition').value,
+        transition_duration: Number(document.getElementById('transition_duration').value),
+        fit_mode: document.getElementById('fit_mode').value,
+        rotation: Number(document.getElementById('rotation').value),
+        brightness: Number(document.getElementById('brightness').value),
+        show_clock: document.getElementById('show_clock').checked,
+        clock_24h: document.getElementById('clock_24h').checked,
+        show_caption: document.getElementById('show_caption').checked,
+        sleep_enabled: document.getElementById('sleep_enabled').checked,
+        sleep_start: document.getElementById('sleep_start').value,
+        sleep_end: document.getElementById('sleep_end').value,
+      };
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        showToast('Settings saved and applied!');
+        loadStatus();
+      } else {
+        showToast('Failed to save settings');
+      }
+    }
+
+    function updateSelectionUI() {
+      const btn = document.getElementById('deleteSelectedBtn');
+      btn.textContent = `Delete Selected (${selectedFiles.size})`;
+      btn.disabled = selectedFiles.size === 0;
+    }
+
+    function toggleSelect(name, checkbox) {
+      if (checkbox.checked) selectedFiles.add(name);
+      else selectedFiles.delete(name);
+      checkbox.closest('.photo-card').classList.toggle('selected', checkbox.checked);
+      updateSelectionUI();
+    }
+
+    function toggleSelectAll() {
+      const selectAll = selectedFiles.size < allPhotos.length;
+      selectedFiles.clear();
+      document.querySelectorAll('.photo-card').forEach(card => {
+        const name = card.dataset.name;
+        const cb = card.querySelector('.select-check');
+        cb.checked = selectAll;
+        card.classList.toggle('selected', selectAll);
+        if (selectAll) selectedFiles.add(name);
+      });
+      updateSelectionUI();
+    }
+
+    async function loadPhotos() {
+      const res = await fetch('/api/photos');
+      const data = await res.json();
+      allPhotos = data.photos || [];
+      selectedFiles.clear();
+      updateSelectionUI();
+
+      const grid = document.getElementById('photoGrid');
+      const empty = document.getElementById('emptyGallery');
+      grid.innerHTML = '';
+
+      if (!allPhotos.length) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      for (const p of allPhotos) {
+        const card = document.createElement('div');
+        card.className = 'photo-card' + (p.name === currentPlaying ? ' playing' : '');
+        card.dataset.name = p.name;
+
+        const safeName = p.name.replace(/"/g, '&quot;');
+        card.innerHTML = `
+          <div class="photo-thumb-wrap" onclick="openLightbox('${encodeURI(p.full_url)}')">
+            <img src="${encodeURI(p.thumb_url)}" alt="${safeName}" loading="lazy" />
+            <input type="checkbox" class="select-check" onclick="event.stopPropagation(); toggleSelect('${safeName}', this)" />
+            <span class="playing-pill" style="display:${p.name === currentPlaying ? 'block' : 'none'}">Now</span>
+          </div>
+          <div class="photo-meta">
+            <div class="photo-name" title="${safeName}">${safeName}</div>
+            <div class="photo-actions">
+              <button onclick="sendControl('jump', {filename: '${safeName}'})" title="Show on frame now">Show</button>
+              <button onclick="rotatePhoto('${safeName}')" title="Rotate 90° clockwise">Rotate</button>
+              <button class="danger" onclick="deletePhoto('${safeName}')" title="Delete photo">Del</button>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      }
+    }
+
+    async function deletePhoto(name) {
+      if (!confirm(`Delete "${name}"?`)) return;
+      const res = await fetch(`/api/photos/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      if (res.ok) {
+        showToast(`Deleted ${name}`);
+        loadPhotos();
+        loadStatus();
+      }
+    }
+
+    async function deleteSelected() {
+      if (!selectedFiles.size) return;
+      if (!confirm(`Delete ${selectedFiles.size} selected photo(s)?`)) return;
+      const res = await fetch('/api/photos/delete-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filenames: Array.from(selectedFiles) })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        showToast(`Deleted ${data.deleted.length} photo(s)`);
+        loadPhotos();
+        loadStatus();
+      }
+    }
+
+    async function rotatePhoto(name) {
+      const res = await fetch(`/api/photos/${encodeURIComponent(name)}/rotate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction: 'cw' })
+      });
+      if (res.ok) {
+        showToast(`Rotated ${name}`);
+        loadPhotos();
+      } else {
+        showToast('Failed to rotate photo');
+      }
+    }
+
+    function uploadFiles(files) {
+      if (!files || !files.length) return;
+      const formData = new FormData();
+      for (const f of files) formData.append('files', f);
+
+      const wrap = document.getElementById('progressWrap');
+      const bar = document.getElementById('progressBar');
+      wrap.style.display = 'block';
+      bar.style.width = '0%';
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/photos/upload');
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          bar.style.width = Math.round((e.loaded / e.total) * 100) + '%';
+        }
+      };
+      xhr.onload = () => {
+        wrap.style.display = 'none';
+        try {
+          const data = JSON.parse(xhr.responseText);
+          const msg = `Uploaded ${data.saved.length} photo(s)` +
+                      (data.errors.length ? ` (${data.errors.length} skipped)` : '');
+          showToast(msg);
+        } catch {
+          showToast('Upload complete');
+        }
+        document.getElementById('fileInput').value = '';
+        loadPhotos();
+        loadStatus();
+      };
+      xhr.onerror = () => {
+        wrap.style.display = 'none';
+        showToast('Upload failed');
+      };
+      xhr.send(formData);
+    }
+
+    function openLightbox(url) {
+      document.getElementById('lightboxImg').src = url;
+      document.getElementById('lightbox').classList.add('open');
+    }
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.remove('open');
+    }
+
+    // Drag & Drop handlers
+    const dropzone = document.getElementById('dropzone');
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      uploadFiles(e.dataTransfer.files);
+    });
+    document.getElementById('fileInput').addEventListener('change', (e) => uploadFiles(e.target.files));
+
+    // Initial load & periodic status refresh
+    loadConfig();
+    loadPhotos();
+    loadStatus();
+    setInterval(loadStatus, 5000);
+  </script>
+</body>
+</html>

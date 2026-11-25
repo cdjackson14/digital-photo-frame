@@ -1,0 +1,20 @@
+[Unit]
+Description=Raspberry Pi Digital Photo Frame
+After=network-online.target local-fs.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__INSTALL_DIR__
+Environment=SDL_VIDEODRIVER=kmsdrm
+Environment=SDL_AUDIODRIVER=dummy
+Environment=SDL_RENDER_VSYNC=1
+Environment=PYGAME_HIDE_SUPPORT_PROMPT=1
+ExecStart=__INSTALL_DIR__/venv/bin/python __INSTALL_DIR__/photoframe.py
+Restart=always
+RestartSec=5
+SupplementaryGroups=video render input
+
+[Install]
+WantedBy=multi-user.target
